@@ -1,0 +1,182 @@
+#File: joint-angles
+#Name: Jessica Shull
+#Date: October 17, 2019
+#Description: Open all images in a folder and process the joint locations and angles. 
+    # Angles to compute are:
+        # elbow angle
+        # knee angle 
+        # shoulder flexion/extension
+        # trunk angle (hip flexion/extension)
+        # neck flexion/extension
+
+import json
+import math
+import numpy as np
+
+# open .json file
+with open('1_keypoints.json') as myfile:
+    data=myfile.read()
+obj = json.loads(data)
+
+# Function to extract joint coordinates (https://bcmullins.github.io/parsing-json-python/)
+def extract_element_from_json(obj, path):
+    '''
+    Extracts an element from a nested dictionary or
+    a list of nested dictionaries along a specified path.
+    If the input is a dictionary, a list is returned.
+    If the input is a list of dictionary, a list of lists is returned.
+    obj - list or dict - input dictionary or list of dictionaries
+    path - list - list of strings that form the path to the desired element
+    '''
+    def extract(obj, path, ind, arr):
+        '''
+            Extracts an element from a nested dictionary
+            along a specified path and returns a list.
+            obj - dict - input dictionary
+            path - list - list of strings that form the JSON path
+            ind - int - starting index
+            arr - list - output list
+        '''
+        key = path[ind]
+        if ind + 1 < len(path):
+            if isinstance(obj, dict):
+                if key in obj.keys():
+                    extract(obj.get(key), path, ind + 1, arr)
+                else:
+                    arr.append(None)
+            elif isinstance(obj, list):
+                if not obj:
+                    arr.append(None)
+                else:
+                    for item in obj:
+                        extract(item, path, ind, arr)
+            else:
+                arr.append(None)
+        if ind + 1 == len(path):
+            if isinstance(obj, list):
+                if not obj:
+                    arr.append(None)
+                else:
+                    for item in obj:
+                        arr.append(item.get(key, None))
+            elif isinstance(obj, dict):
+                arr.append(obj.get(key, None))
+            else:
+                arr.append(None)
+        return arr
+    if isinstance(obj, dict):
+        return extract(obj, path, 0, [])
+    elif isinstance(obj, list):
+        outer_arr = []
+        for item in obj:
+            outer_arr.append(extract(item, path, 0, []))
+        return outer_arr
+    
+# Extract joint coordinates (x, y, confidence index) of arms
+Left_shoulder = np.array(extract_element_from_json(obj, ["part_candidates", "5"]))
+Left_elbow = np.array(extract_element_from_json(obj, ["part_candidates", "6"]))
+Left_wrist = np.array(extract_element_from_json(obj, ["part_candidates", "7"]))
+
+Right_shoulder = np.array(extract_element_from_json(obj, ["part_candidates", "2"]))
+Right_elbow = np.array(extract_element_from_json(obj, ["part_candidates", "3"]))
+Right_wrist = np.array(extract_element_from_json(obj, ["part_candidates", "4"]))
+
+# Extract joint coordinates (x, y) of Left arm
+Left_shoulder = [val for sublist in Left_shoulder for val in sublist]
+Lshoulder = Left_shoulder[:2]
+print("Left shoulder =", Lshoulder)
+print()
+
+Left_elbow = [val for sublist in Left_elbow for val in sublist]
+Lelbow = Left_elbow[:2]
+print("Left elbow =", Lelbow)
+print()
+
+Left_wrist = [val for sublist in Left_wrist for val in sublist]
+Lwrist = Left_wrist[:2]
+print("Left wrist =", Lwrist)
+print()
+
+# Extract joint coordinates (x, y) of Right arm
+Right_shoulder = [val for sublist in Right_shoulder for val in sublist]
+Rshoulder = Right_shoulder[:2]
+print("Right shoulder =", Rshoulder)
+print()
+
+Right_elbow = [val for sublist in Right_elbow for val in sublist]
+Relbow = Right_elbow[:2]
+print("Right elbow =", Relbow)
+print()
+
+Right_wrist = [val for sublist in Right_wrist for val in sublist]
+
+Ri_wrist_conf = []
+if len(Right_wrist) > 3:
+    #print("The right wrist vector length is greater than 3")
+    #print()
+    for i in Right_wrist[2::3]:
+        Ri_wrist_conf.append(i)
+        conf = np.hstack(Ri_wrist_conf)
+                
+else:
+    print("Right wrist =", Right_wrist[:2])
+
+
+#print("The confidence vector =", conf)
+#print()
+#Confidence = max(Ri_wrist_conf)
+#print("The max confidence value =", Confidence)
+Right_wrist = []    
+
+if conf[0] > conf[1]:
+    Right_wrist = Rwrist1
+else:
+    Right_wrist = Rwrist2
+
+#print("Right wrist =", Right_wrist)
+
+Rwrist = Right_wrist[:2]
+print("Right wrist =", Rwrist)
+print()
+
+# Compute the distance between the joints in the Left arm
+Lshoulder = np.array(Lshoulder)
+Lelbow = np.array(Lelbow)
+UA = np.array(Lshoulder - Lelbow)
+print(UA)
+
+Lwrist = np.array(Lwrist)
+FA = np.array(Lwrist - Lelbow)
+print(FA)
+
+# Compute the distance between the joints in the Right arm
+Rshoulder = np.array(Rshoulder)
+Relbow = np.array(Relbow)
+RUA = np.array(Rshoulder - Relbow)
+print(RUA)
+
+Rwrist = np.array(Rwrist)
+RFA = np.array(Rwrist - Relbow)
+print(RFA)
+
+# Compute the dot product of the Upper arm and Forearm segments
+dotL = np.dot(UA, FA)
+dotR = np.dot(RUA, RFA)
+#print(dot)
+
+# find magnitude of UA and FA
+shape_u = np.linalg.norm(UA)
+shape_f = np.linalg.norm(FA)
+
+shape_ur = np.linalg.norm(RUA)
+shape_fr = np.linalg.norm(RFA)
+#print(shape_u)
+#print(shape_f)
+
+print()
+degrees_left_elbow = (180/np.pi)*(np.arccos(dotL/(shape_u*shape_f)))
+print("Degrees of Left Elbow =" , degrees_left_elbow)
+
+print()
+degrees_right_elbow = (180/np.pi)*(np.arccos(dotR/(shape_ur*shape_fr)))
+print("Degrees of Right Elbow =" , degrees_right_elbow)
